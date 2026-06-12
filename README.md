@@ -1,5 +1,4 @@
 # Execution Proofs
-> STATUS: DRAFT — 內部評估中，尚未開源
 
 Execution Proofs is a local MCP server that verifies whether an AI agent's completion claim is source-bound to real output artifacts at runtime. It checks the existence of claimed files and, when requested, whether those files were modified within a freshness window.
 
@@ -13,8 +12,6 @@ Positioning: Execution Proofs is a **lightweight physical telemetry gate** — t
 | DeepEval | Test-time evaluation | Quality regressions measured by evaluation cases | Runtime gate for completion claims, independent of offline eval suites. |
 | soplint | Static behavior checks | Process or SOP drift before or around execution | Runtime proof that claimed output artifacts are physically present. |
 | AgentLiar | Static diff analysis + optional LLM judge | Placeholders / weak tests / scope-narrowing inside a supplied git diff | We never judge diff quality — we extract artifact tokens from the completion claim itself and physically verify the files exist and are fresh, with zero LLM. AgentLiar requires an externally supplied diff and has no file-existence check. |
-
-Market notes and star counts: TODO（待主腦補）.
 
 ## MCP Usage
 

@@ -4,3 +4,6 @@ dist-cjs/
 coverage/
 *.log
 .env
+
+# 內部起源紀錄(含營運細節,不開源)
+.origin/
