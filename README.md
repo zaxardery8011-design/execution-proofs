@@ -3,6 +3,8 @@
 
 Execution Proofs is a local MCP server that verifies whether an AI agent's completion claim is source-bound to real output artifacts at runtime. It checks the existence of claimed files and, when requested, whether those files were modified within a freshness window.
 
+The core verifier supports both ESM `import` and CommonJS `require` consumers.
+
 Positioning: Execution Proofs is a **lightweight physical telemetry gate** — the first ultra-fast, low-cost filter before CI, tests, review, or LLM-as-judge workflows.
 
 | Tool / pattern | Primary layer | What it catches | Execution Proofs difference |

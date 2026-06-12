@@ -6,12 +6,25 @@
   "bin": {
     "execution-proofs": "./dist/server.js"
   },
+  "main": "./dist-cjs/src/core.js",
+  "module": "./dist/src/core.js",
+  "types": "./dist/src/core.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/core.d.ts",
+      "import": "./dist/src/core.js",
+      "require": "./dist-cjs/src/core.js"
+    }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc -p tsconfig.json",
+    "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/write-cjs-package.cjs",
     "test": "npm run build && node --test \"dist/**/*.test.js\""
   },
   "files": [
     "dist",
+    "dist-cjs",
     "README.md"
   ],
   "dependencies": {
