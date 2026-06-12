@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { verifyClaim } from "../src/core.js";
+import { extractClaimTokens, verifyClaim } from "../src/core.js";
 
 test("TRUE_DONE when a claimed file exists", () => {
   const root = makeTempRoot();
@@ -80,6 +80,69 @@ test("returns NO_CLAIM when there are no path-like tokens", () => {
 
   assert.equal(result.verdict, "NO_CLAIM");
   assert.equal(result.total, 0);
+});
+
+test("extracts POSIX absolute paths and ignores obvious fake tokens", () => {
+  const tokens = extractClaimTokens("Done: /home/x/out.txt `1.2.3` `v0` `foo.bar()` `result.json`");
+
+  assert.deepEqual(tokens, ["/home/x/out.txt", "result.json"]);
+});
+
+test("STALE when a bound file predates task_started_at", () => {
+  const root = makeTempRoot();
+  const output = path.join(root, "before-baseline.txt");
+  fs.writeFileSync(output, "old enough");
+
+  const modifiedAt = new Date(Date.now() - 60 * 1000);
+  fs.utimesSync(output, modifiedAt, modifiedAt);
+
+  const result = verifyClaim({
+    claim_text: `Done: ${output}`,
+    search_roots: [root],
+    since_minutes: 5,
+    task_started_at: new Date(Date.now() - 1000).toISOString()
+  });
+
+  assert.equal(result.verdict, "STALE");
+  assert.equal(result.total, 1);
+  assert.equal(result.bound, 0);
+  assert.equal(result.stale, 1);
+});
+
+test("does not verify tokens mentioned in negative contexts", () => {
+  const root = makeTempRoot();
+  const output = path.join(root, "real.txt");
+  fs.writeFileSync(output, "ok");
+
+  const result = verifyClaim({
+    claim_text: "未修改 `skip.txt`; Done: `real.txt`; did not touch `other.txt`; no changes to `third.txt`",
+    search_roots: [root]
+  });
+
+  assert.equal(result.verdict, "TRUE_DONE");
+  assert.equal(result.total, 1);
+  assert.equal(result.bound, 1);
+  assert.equal(result.items[0]?.claim, "real.txt");
+});
+
+test("marks absolute paths outside search roots as out_of_scope without binding them", () => {
+  const root = makeTempRoot();
+  const outsideRoot = makeTempRoot();
+  const outside = path.join(outsideRoot, "outside.txt");
+  fs.writeFileSync(outside, "exists but out of scope");
+
+  const result = verifyClaim({
+    claim_text: `Done: ${outside}`,
+    search_roots: [root]
+  });
+
+  assert.equal(result.verdict, "PSEUDO_DONE");
+  assert.equal(result.total, 1);
+  assert.equal(result.bound, 0);
+  assert.equal(result.out_of_scope, 1);
+  assert.equal(result.items[0]?.status, "out_of_scope");
+  assert.equal(result.items[0]?.actual, null);
+  assert.equal(result.items[0]?.mtime, null);
 });
 
 function makeTempRoot(): string {

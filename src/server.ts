@@ -37,6 +37,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: "number",
             description: "Freshness window in minutes. 0 disables freshness checks.",
             default: 0
+          },
+          task_started_at: {
+            type: "string",
+            description: "Optional ISO timestamp. Claimed artifacts older than this baseline are stale."
           }
         },
         required: ["claim_text"],
@@ -71,6 +75,7 @@ function parseVerifyClaimArgs(value: unknown): {
   claim_text: string;
   search_roots?: string[];
   since_minutes?: number;
+  task_started_at?: string;
 } {
   if (!value || typeof value !== "object") {
     throw new Error("verify_claim requires an object argument.");
@@ -92,9 +97,14 @@ function parseVerifyClaimArgs(value: unknown): {
     throw new Error("verify_claim.since_minutes must be a number.");
   }
 
+  if (input.task_started_at !== undefined && typeof input.task_started_at !== "string") {
+    throw new Error("verify_claim.task_started_at must be a string.");
+  }
+
   return {
     claim_text: input.claim_text,
     search_roots: input.search_roots as string[] | undefined,
-    since_minutes: input.since_minutes as number | undefined
+    since_minutes: input.since_minutes as number | undefined,
+    task_started_at: input.task_started_at as string | undefined
   };
 }
