@@ -105,3 +105,13 @@ Container, VM, and host filesystem isolation can produce false negatives. If the
 npm install
 npm test
 ```
+
+## Related — the discipline toolchain
+
+Part of a small set of tools for making AI agents finish work and stay disciplined — **engine + guardrails**:
+
+- **[aiwff-runtime](https://github.com/zaxardery8011-design/aiwff-runtime)** — the local agent runtime (the engine that runs disciplined agents)
+- **[soplint](https://github.com/zaxardery8011-design/soplint)** — static SOP-compliance audit for AI work nodes
+- **[execution-proofs](https://github.com/zaxardery8011-design/execution-proofs)** — MCP telemetry gateway: force agents to prove "done" with real files & timestamps (this repo)
+
+> 引擎（跑得動的 agent）＋護欄（審紀律、逼證明），同一套「讓 AI 守紀律」哲學的兩面。
