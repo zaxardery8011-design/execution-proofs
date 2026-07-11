@@ -125,7 +125,7 @@ test("does not verify tokens mentioned in negative contexts", () => {
   assert.equal(result.items[0]?.claim, "real.txt");
 });
 
-test("marks absolute paths outside search roots as out_of_scope without binding them", () => {
+test("binds exact absolute paths outside search roots and marks them out_of_root", () => {
   const root = makeTempRoot();
   const outsideRoot = makeTempRoot();
   const outside = path.join(outsideRoot, "outside.txt");
@@ -136,13 +136,58 @@ test("marks absolute paths outside search roots as out_of_scope without binding 
     search_roots: [root]
   });
 
+  assert.equal(result.verdict, "TRUE_DONE");
+  assert.equal(result.total, 1);
+  assert.equal(result.bound, 1);
+  assert.equal(result.out_of_scope, 0);
+  assert.equal(result.items[0]?.status, "bound");
+  assert.equal(result.items[0]?.actual, outside);
+  assert.equal(result.items[0]?.out_of_root, true);
+  assert.equal(result.items[0]?.reason, "out_of_root_exact_bound");
+});
+
+test("does not relocate missing absolute paths outside search roots", () => {
+  const root = makeTempRoot();
+  const outsideRoot = makeTempRoot();
+  const outside = path.join(outsideRoot, "same-name.txt");
+  fs.writeFileSync(path.join(root, "same-name.txt"), "inside copy");
+
+  const result = verifyClaim({
+    claim_text: `Done: ${outside}`,
+    search_roots: [root]
+  });
+
   assert.equal(result.verdict, "PSEUDO_DONE");
   assert.equal(result.total, 1);
   assert.equal(result.bound, 0);
-  assert.equal(result.out_of_scope, 1);
-  assert.equal(result.items[0]?.status, "out_of_scope");
+  assert.equal(result.unbound, 1);
+  assert.equal(result.items[0]?.status, "unbound");
   assert.equal(result.items[0]?.actual, null);
-  assert.equal(result.items[0]?.mtime, null);
+  assert.equal(result.items[0]?.out_of_root, true);
+  assert.equal(result.items[0]?.reason, "out_of_root_missing");
+});
+
+test("STALE when a bound file is newer than task_finished_at", () => {
+  const root = makeTempRoot();
+  const output = path.join(root, "after-finish.txt");
+  fs.writeFileSync(output, "newer than task");
+
+  const modifiedAt = new Date(Date.now() - 1000);
+  fs.utimesSync(output, modifiedAt, modifiedAt);
+
+  const result = verifyClaim({
+    claim_text: `Done: ${output}`,
+    search_roots: [root],
+    task_started_at: new Date(Date.now() - 60 * 1000).toISOString(),
+    task_finished_at: new Date(Date.now() - 30 * 1000).toISOString()
+  });
+
+  assert.equal(result.verdict, "STALE");
+  assert.equal(result.total, 1);
+  assert.equal(result.bound, 0);
+  assert.equal(result.stale, 1);
+  assert.equal(result.items[0]?.status, "stale");
+  assert.equal(result.items[0]?.reason, "after_fresh_until");
 });
 
 function makeTempRoot(): string {

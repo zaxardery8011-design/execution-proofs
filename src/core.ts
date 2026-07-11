@@ -3,6 +3,7 @@ import path from "node:path";
 
 export type Verdict = "TRUE_DONE" | "PSEUDO_DONE" | "STALE" | "NO_CLAIM";
 export type ItemStatus = "bound" | "stale" | "unbound" | "out_of_scope";
+export const VERIFIER_VERSION = "execution-proofs-cr4a-v1";
 
 export interface VerificationItem {
   claim: string;
@@ -10,7 +11,9 @@ export interface VerificationItem {
   actual: string | null;
   mtime: string | null;
   relocated: boolean;
+  out_of_root: boolean;
   age_min: number | null;
+  reason: string;
 }
 
 export interface VerificationResult {
@@ -29,6 +32,8 @@ export interface VerifyClaimOptions {
   search_roots?: string[];
   since_minutes?: number;
   task_started_at?: string;
+  task_finished_at?: string;
+  fresh_until?: string;
 }
 
 const ABSOLUTE_WINDOWS_PATH = /[A-Za-z]:\\[^\s`'"<>|]+/g;
@@ -61,21 +66,29 @@ export function verifyClaim(options: VerifyClaimOptions): VerificationResult {
   const sinceMinutes = options.since_minutes ?? 0;
   const searchRoots = options.search_roots?.length ? options.search_roots : [process.cwd()];
   const resolvedSearchRoots = searchRoots.map((root) => path.resolve(root));
-  const taskStartedAtMs = parseTaskStartedAt(options.task_started_at);
+  const taskStartedAtMs = parseOptionalTimestamp(options.task_started_at, "task_started_at");
+  const freshUntilMs = parseOptionalTimestamp(options.task_finished_at ?? options.fresh_until, "task_finished_at/fresh_until");
   const now = Date.now();
   const items = extractClaimTokens(options.claim_text).map((token) => {
     const clean = cleanToken(token);
     const leaf = getLeafName(clean);
     const absolute = isAbsolutePath(clean);
+    const outOfRoot = absolute && !isWithinAnySearchRoot(clean, resolvedSearchRoots);
 
-    if (absolute && !isWithinAnySearchRoot(clean, resolvedSearchRoots)) {
+    if (outOfRoot) {
+      const found = getExactExistingFile(clean);
+      if (found) {
+        return buildItem(token, found, false, true, sinceMinutes, taskStartedAtMs, freshUntilMs, now);
+      }
       return {
         claim: token,
-        status: "out_of_scope" as const,
+        status: "unbound" as const,
         actual: null,
         mtime: null,
         relocated: false,
-        age_min: null
+        out_of_root: true,
+        age_min: null,
+        reason: "out_of_root_missing"
       };
     }
 
@@ -94,23 +107,13 @@ export function verifyClaim(options: VerifyClaimOptions): VerificationResult {
         actual: null,
         mtime: null,
         relocated: false,
-        age_min: null
+        out_of_root: false,
+        age_min: null,
+        reason: "missing"
       };
     }
 
-    const ageMin = roundOneDecimal((now - found.mtimeMs) / 60000);
-    const freshByWindow = sinceMinutes <= 0 || ageMin <= sinceMinutes;
-    const freshByBaseline = taskStartedAtMs === null || found.mtimeMs >= taskStartedAtMs;
-    const fresh = freshByWindow && freshByBaseline;
-
-    return {
-      claim: token,
-      status: fresh ? ("bound" as const) : ("stale" as const),
-      actual: found.fullPath,
-      mtime: found.mtime.toISOString(),
-      relocated,
-      age_min: ageMin
-    };
+    return buildItem(token, found, relocated, false, sinceMinutes, taskStartedAtMs, freshUntilMs, now);
   });
 
   const unbound = items.filter((item) => item.status === "unbound").length;
@@ -224,6 +227,78 @@ function getExistingFile(candidate: string, searchRoots: string[]): { fullPath: 
   return null;
 }
 
+function getExactExistingFile(candidate: string): { fullPath: string; mtime: Date; mtimeMs: number } | null {
+  try {
+    const stats = fs.statSync(candidate);
+    if (stats.isFile()) {
+      return { fullPath: path.resolve(candidate), mtime: stats.mtime, mtimeMs: stats.mtimeMs };
+    }
+  } catch {
+    // Exact out-of-root verification is fail-open at the verifier layer: missing/inaccessible means unbound.
+  }
+
+  return null;
+}
+
+function buildItem(
+  claim: string,
+  found: { fullPath: string; mtime: Date; mtimeMs: number },
+  relocated: boolean,
+  outOfRoot: boolean,
+  sinceMinutes: number,
+  taskStartedAtMs: number | null,
+  freshUntilMs: number | null,
+  now: number
+): VerificationItem {
+  const ageMin = roundOneDecimal((now - found.mtimeMs) / 60000);
+  const freshByWindow = sinceMinutes <= 0 || ageMin <= sinceMinutes;
+  const freshByBaseline = taskStartedAtMs === null || found.mtimeMs >= taskStartedAtMs;
+  const freshByUpper = freshUntilMs === null || found.mtimeMs <= freshUntilMs;
+  const fresh = freshByWindow && freshByBaseline && freshByUpper;
+
+  return {
+    claim,
+    status: fresh ? ("bound" as const) : ("stale" as const),
+    actual: found.fullPath,
+    mtime: found.mtime.toISOString(),
+    relocated,
+    out_of_root: outOfRoot,
+    age_min: ageMin,
+    reason: getItemReason(fresh, freshByWindow, freshByBaseline, freshByUpper, relocated, outOfRoot)
+  };
+}
+
+function getItemReason(
+  fresh: boolean,
+  freshByWindow: boolean,
+  freshByBaseline: boolean,
+  freshByUpper: boolean,
+  relocated: boolean,
+  outOfRoot: boolean
+): string {
+  if (!freshByBaseline) {
+    return outOfRoot ? "out_of_root_before_task_started_at" : "before_task_started_at";
+  }
+
+  if (!freshByUpper) {
+    return outOfRoot ? "out_of_root_after_fresh_until" : "after_fresh_until";
+  }
+
+  if (!freshByWindow) {
+    return outOfRoot ? "out_of_root_older_than_since_minutes" : "older_than_since_minutes";
+  }
+
+  if (fresh) {
+    if (outOfRoot) {
+      return "out_of_root_exact_bound";
+    }
+
+    return relocated ? "relocated_by_leaf" : "exact_bound";
+  }
+
+  return "stale";
+}
+
 function findFirstByLeaf(searchRoots: string[], leaf: string): { fullPath: string; mtime: Date; mtimeMs: number } | null {
   for (const root of searchRoots) {
     const found = findFirstByLeafInRoot(root, leaf);
@@ -278,14 +353,14 @@ function isWithinRoot(candidate: string, root: string): boolean {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
-function parseTaskStartedAt(value: string | undefined): number | null {
+function parseOptionalTimestamp(value: string | undefined, fieldName: string): number | null {
   if (value === undefined) {
     return null;
   }
 
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) {
-    throw new Error("task_started_at must be a valid ISO timestamp.");
+    throw new Error(`${fieldName} must be a valid ISO timestamp.`);
   }
 
   return parsed;
