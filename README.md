@@ -30,7 +30,7 @@ Add the server to an MCP client configuration:
     "execution-proofs": {
       "command": "node",
       "args": [
-        "C:\\Users\\User\\Desktop\\AIWORK\\execution-proofs\\dist\\server.js"
+        "<repo>/dist/server.js"
       ]
     }
   }
@@ -77,7 +77,7 @@ Verdicts:
 
 Token extraction follows the AIWFF source-binding gate semantics:
 
-- absolute Windows paths such as `C:\AIWFF\outbox\result.jsonl`
+- absolute Windows paths such as `C:\AIWFF\outbox\result.jsonl` (example path, replace with your own)
 - absolute POSIX paths such as `/home/x/out.txt`
 - backtick-wrapped filenames or relative paths that include a path separator or extension, such as `result.jsonl` or `outbox/result.jsonl`
 
