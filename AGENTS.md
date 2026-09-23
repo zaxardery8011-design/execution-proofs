@@ -102,17 +102,6 @@ Then confirm the MCP entry point exists: `dist/server.js` must be present after 
 
 ---
 
-## Behavior notes the README does not match (read before trusting a verdict)
-
-- **Absolute paths outside `search_roots`.** `README.md` says they are marked `out_of_scope` and not stat'ed. The current code stats the exact path: if it exists the item is `bound` with `out_of_root: true` and reason `out_of_root_exact_bound` (verdict can be `TRUE_DONE`); if missing it is `unbound` with reason `out_of_root_missing`. The code never emits status `out_of_scope`, so the `out_of_scope` count stays `0`. `test/core.test.ts` asserts the code's behavior.
-  - `TODO(confirm)`: which one is intended. Until confirmed, describe the code's behavior to the user.
-- **Library-only options.** `verifyClaim()` in `src/core.ts` also accepts `task_finished_at` / `fresh_until` (files newer than it become `stale`, reason `after_fresh_until`). These are **not** exposed through the MCP tool schema and not in `README.md`.
-- The README response example shows `"total": 1` with `"items": []`; real responses include one item per extracted token.
-
-> 注意：README 說範圍外的絕對路徑標 `out_of_scope` 不查，但現行程式碼會直接查該路徑；`task_finished_at` 只在函式庫可用、MCP 沒開。
-
----
-
 ## How it relates to sibling repos
 
 execution-proofs is on the **guardrails** side (with `soplint` and `task-ledger`); `aiwff-runtime` / `aiwff-mini` are the **engine**.
