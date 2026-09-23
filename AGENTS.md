@@ -82,7 +82,13 @@ Requires Node.js 20+ (`package.json` → `engines`). No API keys or secrets are 
      }
    }
    ```
-   - `TODO(confirm)`: which config file each client uses (Claude Code / Cursor / Codex) is not documented in this repo. Ask the user where their MCP config lives; do not guess.
+   - **Claude Code** (syntax from the official docs, https://code.claude.com/docs/en/mcp): run from the project where you want it, with `<repo>` as above:
+     ```bash
+     claude mcp add --transport stdio execution-proofs -- node <repo>/dist/server.js
+     ```
+     Default scope is `local` (this project only, stored in `~/.claude.json`). Add `--scope user` for all projects, or `--scope project` to write the same `mcpServers` JSON into `.mcp.json` at the project root so a team shares it. Verify with `claude mcp list` or `/mcp` inside a session: it should show `execution-proofs` as `✔ Connected`.
+   - `TODO(confirm)`: Cursor and Codex config file locations are not documented in this repo. Ask the user where their MCP config lives; do not guess.
+   - If a verdict looks wrong, the repo ships an issue template for exactly that case: `.github/ISSUE_TEMPLATE/green-but-wrong.md`.
 4. Call `verify_claim` with (source: `src/server.ts` input schema):
    - `claim_text` (string, required)
    - `search_roots` (string[]) — if omitted, defaults to the **server process's current working directory** (`src/core.ts`). That directory depends on how the client launches the server, so always pass `search_roots` explicitly.
