@@ -43,8 +43,8 @@ The server exposes one tool:
 {
   "name": "verify_claim",
   "arguments": {
-    "claim_text": "Done: C:\\AIWFF\\outbox\\result.jsonl",
-    "search_roots": ["C:\\AIWFF"],
+    "claim_text": "Done: <YOUR_ROOT>\\outbox\\result.jsonl",
+    "search_roots": ["<YOUR_ROOT>"],
     "since_minutes": 30,
     "task_started_at": "2026-06-12T08:40:00.000Z"
   }
@@ -77,7 +77,7 @@ Verdicts:
 
 Token extraction follows the AIWFF source-binding gate semantics:
 
-- absolute Windows paths such as `C:\AIWFF\outbox\result.jsonl` (example path, replace with your own)
+- absolute Windows paths such as `<YOUR_ROOT>\outbox\result.jsonl` (example path, replace with your own)
 - absolute POSIX paths such as `/home/x/out.txt`
 - backtick-wrapped filenames or relative paths that include a path separator or extension, such as `result.jsonl` or `outbox/result.jsonl`
 
